@@ -1,0 +1,54 @@
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkContext._
+import org.apache.spark.SparkConf
+
+object mutualFriendList {
+  def main(args: Array[String]) {
+	
+ 	val conf = new SparkConf().setAppName("mutualFriendList")
+  val sc = new SparkContext(conf)
+	
+	val txtFile = sc.textFile("/home/vaishthiru/Downloads/spark-1.6.0-bin-hadoop2.6/soc-LiveJournal1Adj.txt")
+	val userIdList = txtFile.map(line => line.split("\t"))
+	val user1List = userIdList.filter(userId => (userId(0) == "49950")) 
+	val user2List = userIdList.filter(userId => (userId(0) == "49940")) 
+	val list1 = user1List.collect.flatten.toList
+	val list2 = user2List.collect.flatten.toList
+	val nList1 = list1(1).split(",").toList
+	val nList2 = list2(1).split(",").toList
+	val keyOfList = list1(0).concat(",").concat(list2(0))
+	val result = nList1.intersect(nList2)
+	println("Mutual Friends: %s  %s".format(keyOfList, result mkString ","))
+	
+	val userDetail = sc.textFile("/home/vaishthiru/Downloads/spark-1.6.0-bin-hadoop2.6/userdata.txt")
+	val userZipCode = userDetail.map(x => (x.split(",")(0), x.split(",")(6)))
+	val userName = userDetail.map(x => (x.split(",")(0), x.split(",")(1)))
+	var resultDetails = List[String]()
+	for( x <- result ){
+		val userZipPair = userZipCode.filter(z=>(z._1 == (x)))
+		val userNamePair = userName.filter(z=>(z._1 == (x)))
+		val r1 = userNamePair.collect		
+		val r2 = userZipPair.collect
+		
+		for( i <- 0 to userZipPair.collect.length - 1){
+			resultDetails = (r1(i)._2).concat(":").concat(r2(i)._2) :: resultDetails
+		}
+  }
+	println("Mutual Friends Details: %s  [%s]".format(keyOfList, resultDetails mkString ","))
+  
+        var ageMap:Map[String,Double] = Map()
+	val uId = userIdList.collect
+	val userDob = userDetail.map(x => (x.split(",")(0), x.split(",")(9)))
+	for(y <- 0 to uId.length - 1){
+   		var avgAge = 0
+		val userIdListSplit = uId(y)(1).split(",")
+		for (userID <- userIdListSplit){
+			val dob = userDob.filter(z=>(z._1 == (userID))).take(1)
+			val age = 2016 - (dob(0)._2.split("/"))(2).toInt
+			avgAge = avgAge + age
+		}
+		ageMap += (uId(y)(0) -> avgAge.toDouble/(userIdListSplit.length))
+         }
+         ageMap.foreach(println)
+ }
+}
